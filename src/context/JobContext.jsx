@@ -1,11 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { INITIAL_JOBS } from '../data/seedJobs';
 import confetti from 'canvas-confetti';
 import { supabase } from '../libs/supabase';
 
 const JobContext = createContext();
 
-const STORAGE_KEY = 'careerpulse_jobs_v1';
 const THEME_KEY = 'careerpulse_theme';
 
 export function JobProvider({ children }) {
@@ -16,7 +14,13 @@ export function JobProvider({ children }) {
     async function fetchJobs(){
       try{
         setLoading(true);
-        const{data, error} = await supabase.from('jobs').select('*').order('created_at',{ascending: false});
+        const{data, error} = await supabase.from('jobs')
+        .select(`
+          *,
+          history:job_history(*),
+          reminders:job_reminders(*)
+          `)
+        .order('created_at',{ascending: false});
         if(error) throw error;
         if(data) setJobs(data);
 
@@ -33,17 +37,7 @@ export function JobProvider({ children }) {
     fetchJobs();
   },[]);
   
-  // useState(() => {
-  //   try {
-  //     const saved = localStorage.getItem(STORAGE_KEY);
-  //     if (saved) {
-  //       return JSON.parse(saved);
-  //     }
-  //   } catch (e) {
-  //     console.error("Error reading localStorage", e);
-  //   }
-  //   return INITIAL_JOBS;
-  // });
+
 
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem(THEME_KEY) || 'dark';
@@ -56,16 +50,7 @@ export function JobProvider({ children }) {
   const [editingJob, setEditingJob] = useState(null); // null = modal closed, {} = new job, { ... } = edit
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // // Sync jobs to localStorage
-  // useEffect(() => {
-  //   try {
-  //     localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
-  //   } catch (e) {
-  //     console.error("Error writing to localStorage", e);
-  //   }
-  // }, [jobs]);
-
-  // Sync theme to root attribute
+ 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem(THEME_KEY, theme);
@@ -76,181 +61,148 @@ export function JobProvider({ children }) {
   };
 
   const addJob = async (jobData) => {
-    const newJob = {
-      ...jobData,
-      id: `job-${Date.now()}`,
-      appliedDate: jobData.appliedDate || new Date().toISOString().split('T')[0],
-      reminders: jobData.reminders || [],
-      history: [
-        {
-          stage: jobData.status || 'applied',
-          date: jobData.appliedDate || new Date().toISOString().split('T')[0],
-          note: 'Application created.'
-        }
-      ]
+
+    const jobId = `job-${Date.now()}`;
+    const appliedDate = jobData.appliedDate || new Date().toISOString().split('T')[0];
+    const initialHistory = {
+      stage: jobData.status || 'applied',
+      date: appliedDate,
+      note: "Application created."
     };
+
+
+      const newJob = {
+        id: jobId,
+        company: jobData.company,
+        role: jobData.role,
+        category: jobData.category,
+        programType: jobData.programType,
+        location: jobData.location,
+        status: jobData.status || 'applied',
+        appliedDate: appliedDate,
+        portalUrl: jobData.portalUrl,
+        salaryRange: jobData.salaryRange,
+        notes: jobData.notes,
+        resumeVersion: jobData.resumeVersion,
+        reminders: [],
+        history: [initialHistory]
+      };
 
     // 1. Update local React state immediately 
     setJobs(prev => [newJob, ...prev]);
 
-    // 2. Persist to Supabase
-    const {error} = await supabase.from('jobs').insert([newJob]);
-    
-    if(error){
-      console.error("Failed to save new job to Supabase: ", error.message);
-      return;
-    }
+    // Insert into 'jobs' table (without child arrays)
+    const { history, reminders, ...jobRecord } = newJob;
+    const { error: jobError } = await supabase.from('jobs').insert([jobRecord]);
+    if (jobError) console.error("Failed to insert job:", jobError.message);
+    // Insert into 'job_history' child table
+    const { error: histError } = await supabase.from('job_history').insert([{
+      job_id: jobId,
+      stage: initialHistory.stage,
+      date: initialHistory.date,
+      note: initialHistory.note
+    }]);
+    if (histError) console.error("Failed to insert initial history:", histError.message);
+  
   };
   
   
-
+  // --- 3. UPDATE JOB & STATUS ---
   const updateJob = async (id, updatedFields) => {
     let updatedJobObj = null;
-
+    let newHistoryItem = null;
     setJobs(prev =>
       prev.map(job => {
         if (job.id !== id) return job;
-        
         let newHistory = job.history || [];
         if (updatedFields.status && updatedFields.status !== job.status) {
-          newHistory = [
-            ...newHistory,
-            {
-              stage: updatedFields.status,
-              date: new Date().toISOString().split('T')[0],
-              note: `Status updated to ${updatedFields.status}`
-            }
-          ];
+          newHistoryItem = {
+            stage: updatedFields.status,
+            date: new Date().toISOString().split('T')[0],
+            note: `Status updated to ${updatedFields.status.replace('_', ' ')}`
+          };
+          newHistory = [...newHistory, newHistoryItem];
           if (updatedFields.status === 'offer' || updatedFields.status === 'accepted') {
             triggerCelebration();
           }
         }
-
         updatedJobObj = {
           ...job,
           ...updatedFields,
           history: newHistory
         };
-
         return updatedJobObj;
-      }));
-
-      // 2. Persist to Supabase (Single Update)
-      if (updatedJobObj){
-        const {error} = await supabase.from('jobs').update(updatedJobObj) .eq('id', id);
-
-        if(error){
-          console.error("Failed to update job in Supabase: ", error.message);
-        }
-      }
-      
-    };
-
-  const updateJobStatus = async (id, newStatus, note = "") => {
-  let updatedJobObj = null;
-
-  setJobs(prev =>
-    prev.map(job => {
-      if (job.id !== id) return job;
-      if (job.status === newStatus) return job;
-
-      if (newStatus === 'offer' || newStatus === 'accepted') {
-        triggerCelebration();
-      }
-
-      const newHistoryItem = {
-        stage: newStatus,
-        date: new Date().toISOString().split('T')[0],
-        note: note || `Moved to ${newStatus.replace('_', ' ')}`
-      };
-
-      updatedJobObj = {
-        ...job,
-        status: newStatus,
-        history: [...(job.history || []), newHistoryItem]
-      };
-      return updatedJobObj;
-    })
-  );
-
-  if (updatedJobObj) {
-    const { error } = await supabase
-      .from('jobs')
-      .update({
-        status: updatedJobObj.status,
-        history: updatedJobObj.history
       })
-      .eq('id', id);
-
-    if (error) console.error('Error updating status in Supabase:', error);
-  }
-};
-
+    );
+    if (updatedJobObj) {
+      // 1. Update jobs table (strip child arrays)
+      const { history, reminders, ...jobRecord } = updatedJobObj;
+      const { error: jobError } = await supabase.from('jobs').update(jobRecord).eq('id', id);
+      if (jobError) console.error("Failed to update job:", jobError.message);
+      // 2. If status changed, insert new row into job_history
+      if (newHistoryItem) {
+        const { error: histError } = await supabase.from('job_history').insert([{
+          job_id: id,
+          stage: newHistoryItem.stage,
+          date: newHistoryItem.date,
+          note: newHistoryItem.note
+        }]);
+        if (histError) console.error("Failed to insert history item:", histError.message);
+      }
+    }
+  };
+  const updateJobStatus = async (id, newStatus, note = "") => {
+    await updateJob(id, { status: newStatus });
+  };
+  // --- 4. DELETE JOB ---
   const deleteJob = async (id) => {
     setJobs(prev => prev.filter(j => j.id !== id));
-
-    const {error} = await supabase.from('jobs').delete().eq('id', id);
-
-    if(error){
-      console.error("Failed to delete job from Supabase: ", error.message);
-    } 
+    // Deleting the job automatically deletes all its history & reminders (ON DELETE CASCADE)
+    const { error } = await supabase.from('jobs').delete().eq('id', id);
+    if (error) console.error("Failed to delete job:", error.message);
   };
-
+  // --- 5. ADD & DELETE REMINDERS ---
   const addReminder = async (jobId, reminderData) => {
     const newReminder = {
-      ...reminderData,
-      id: `rem-${Date.now()}`
+      id: `rem-${Date.now()}`,
+      job_id: jobId,
+      title: reminderData.title,
+      date: reminderData.date,
+      time: reminderData.time || null,
+      durationMinutes: reminderData.durationMinutes || 30,
+      type: reminderData.type || 'General',
+      locationOrLink: reminderData.locationOrLink || '',
+      notes: reminderData.notes || ''
     };
-
-    let updatedReminders = [];
-
+    // Immediate UI update
     setJobs(prev =>
       prev.map(job => {
         if (job.id !== jobId) return job;
-        updatedReminders = [...(job.reminders || []), newReminder];
         return {
           ...job,
-          reminders: updatedReminders
+          reminders: [...(job.reminders || []), newReminder]
         };
       })
     );
-
-    // Persist to Supabase
-    const { error } = await supabase
-      .from('jobs')
-      .update({ reminders: updatedReminders })
-      .eq('id', jobId);
-
-    if (error) {
-      console.error("Failed to add reminder to Supabase: ", error.message);
-    }
+    // Insert into 'job_reminders' table
+    const { error } = await supabase.from('job_reminders').insert([newReminder]);
+    if (error) console.error("Failed to add reminder:", error.message);
   };
-
   const deleteReminder = async (jobId, reminderId) => {
-    let updatedReminders = [];
-
+    // Immediate UI update
     setJobs(prev =>
       prev.map(job => {
         if (job.id !== jobId) return job;
-        updatedReminders = (job.reminders || []).filter(r => r.id !== reminderId);
         return {
           ...job,
-          reminders: updatedReminders
+          reminders: (job.reminders || []).filter(r => r.id !== reminderId)
         };
       })
     );
-
-    // Persist to Supabase
-    const { error } = await supabase
-      .from('jobs')
-      .update({ reminders: updatedReminders })
-      .eq('id', jobId);
-
-    if (error) {
-      console.error("Failed to delete reminder from Supabase: ", error.message);
-    }
+    // Delete from 'job_reminders' table
+    const { error } = await supabase.from('job_reminders').delete().eq('id', reminderId);
+    if (error) console.error("Failed to delete reminder:", error.message);
   };
-
 
   const triggerCelebration = () => {
     try {
@@ -349,7 +301,7 @@ export function JobProvider({ children }) {
 
   const resetToDefaultData = () => {
     if (window.confirm("Are you sure you want to reset all jobs to the initial 14 applications? Any unsaved changes will be lost.")) {
-      setJobs(INITIAL_JOBS);
+      //setJobs(INITIAL_JOBS);
     }
   };
 
