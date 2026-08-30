@@ -1,0 +1,36 @@
+# The name displayed in your GitHub Actions dashboard
+
+name: Continuous Integration (CI)
+# 1. TRIGGER: When should this robot run?
+
+on: 
+  push: 
+    branches: ["main"]  # Whenever you push to the 'main' branch
+
+  pull_request:
+    branches: ["main"]  # Whenever someone opens a Pull Request to 'main'
+
+# 2. JOBS: What work should the robot do?
+jobs: 
+  test-and-build:
+    runs-on: ubuntu-latest # Spawns a fresh, clean Linux cloud computer
+
+    steps:
+       # Step 1: Download your code into the Linux machine
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.jobs
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Run Automated Unit Tests
+        run: npm run test
+        
+      - name: Verify Production build
+        run: npm run build
