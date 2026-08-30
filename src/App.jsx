@@ -6,6 +6,7 @@ import KanbanBoard from './components/KanbanBoard';
 import TableView from './components/TableView';
 import SankeyView from './components/SankeyView';
 import RemindersView from './components/RemindersView';
+import UserProfileView from './components/UserProfileView';
 import JobModal from './components/JobModal';
 import { AuthProvider } from './context/AuthContext';
 import './App.css';
@@ -18,14 +19,15 @@ function MainApp() {
       <Navbar />
       
       <main className="main-content">
-        {/* Top KPI Metric Cards */}
-        <StatsSummary />
+        {/* Top KPI Metric Cards (shown on pipeline/tracker views) */}
+        {activeTab !== 'profile' && <StatsSummary />}
 
         {/* Dynamic Views */}
         {activeTab === 'kanban' && <KanbanBoard />}
         {activeTab === 'table' && <TableView />}
         {activeTab === 'sankey' && <SankeyView />}
         {activeTab === 'reminders' && <RemindersView />}
+        {activeTab === 'profile' && <UserProfileView />}
       </main>
 
       {/* Global Application Detail / Add Modal */}

@@ -1,17 +1,24 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { supabase } from '../libs/supabase';
+import {useAuth} from './AuthContext';
 
 const JobContext = createContext();
 
 const THEME_KEY = 'careerpulse_theme';
 
 export function JobProvider({ children }) {
+  const {user} = useAuth(); // get current user
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(()=>{
     async function fetchJobs(){
+      // if no user is logged in, empty the list
+      if (!user){
+        setJobs([]);
+        return;
+      }
       try{
         setLoading(true);
         const{data, error} = await supabase.from('jobs')
@@ -20,6 +27,7 @@ export function JobProvider({ children }) {
           history:job_history(*),
           reminders:job_reminders(*)
           `)
+        .eq('user_id',user.id) // Filter only this user's jobs!
         .order('created_at',{ascending: false});
         if(error) throw error;
         if(data) setJobs(data);
@@ -35,7 +43,7 @@ export function JobProvider({ children }) {
 
     }
     fetchJobs();
-  },[]);
+  },[user]);
   
 
 
@@ -73,6 +81,7 @@ export function JobProvider({ children }) {
 
       const newJob = {
         id: jobId,
+        user_id: user?.id, // IMPORTANT: set the owner
         company: jobData.company,
         role: jobData.role,
         category: jobData.category,

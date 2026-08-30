@@ -1,5 +1,5 @@
 import React, {createContext, useContext, useState, useEffect} from 'react';
-import {supabase} from '../lib/supabase'
+import {supabase} from '../libs/supabase'
 
 
 const AuthContext = createContext();
@@ -10,6 +10,7 @@ export const AuthProvider = ({ children }) => {
     const [profile, setProfile] = useState(null);
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isPasswordReset, setIsPasswordReset] = useState(false); // detects if user arrived via reset link
 
     useEffect(() =>{
         // 1. get initial session on page load
@@ -29,10 +30,14 @@ export const AuthProvider = ({ children }) => {
         getInitialSession();
 
         // 2. Listen for auth changes (login, logout, session refresh)
-        const {data:{subscription}} = supabase.auth.onAuthStateChange((_event, newSession) =>{
+        const {data:{subscription}} = supabase.auth.onAuthStateChange((event, newSession) =>{
             setSession(newSession);
             setUser(newSession?.user??null);
             setLoading(false);
+
+            if (event === 'PASSWORD_RECOVERY'){
+                setIsPasswordReset(true);
+            }
 
         });
 
@@ -51,7 +56,7 @@ export const AuthProvider = ({ children }) => {
         return data;
     };
 
-    const signIn = async ({email,password}) =>{
+    const signIn = async (email,password) =>{
         const {data,error} = await supabase.auth.signInWithPassword({
             email,
             password,
@@ -60,16 +65,61 @@ export const AuthProvider = ({ children }) => {
         return data;
     };
 
-    const signOut = async() =>{
-        const {error} = await supabase.auth.signOut();
-        if (error) return error;
-        
-    }
+    const signOut = async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+    };
+
+    // send forgot password email
+    const resetPassword = async (email) => {
+        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin, // redirect back to local live app
+        });
+        if (error) throw error;
+        return data;    
+    };
+
+    const updatePassword = async (newPassword) => {
+        const { data, error } = await supabase.auth.updateUser({
+            password: newPassword,
+        });
+        if (error) throw error;
+        return data;
+    };
+
+    const deleteAccount = async () => {
+        if (!user) return;
+        // 1. Delete user jobs from jobs table
+        const { error: dataError } = await supabase.from('jobs').delete().eq('user_id', user.id);
+        if (dataError) console.error("Error deleting user data: ", dataError.message);
+
+        // 2. Call delete_user RPC if present
+        try {
+            await supabase.rpc('delete_user');
+        } catch (rpcErr) {
+            console.warn("RPC delete_user not configured:", rpcErr);
+        }
+
+        // 3. Sign out session
+        await signOut();
+    };
 
     return (
         <AuthContext.Provider
-            value = {{user, sessions, loading,signUp, signIn, signOut}}
-            >
+            value={{
+                user,
+                session,
+                loading,
+                isPasswordReset,
+                setIsPasswordReset,
+                signUp,
+                signIn,
+                signOut,
+                resetPassword,
+                updatePassword,
+                deleteAccount,
+            }}>
+            
 
         {children}
         </AuthContext.Provider>

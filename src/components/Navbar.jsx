@@ -1,5 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useJobs } from '../context/JobContext';
+import { useAuth } from '../context/AuthContext';
+import AuthModal from './AuthModal';
+import LogoutConfirmModal from './LogoutConfirmModal';
 import {
   Briefcase,
   Kanban,
@@ -13,11 +16,18 @@ import {
   Upload,
   RotateCcw,
   Search,
-  SlidersHorizontal
+  SlidersHorizontal,
+  LogIn,
+  LogOut,
+  User
 } from 'lucide-react';
 import { CATEGORIES } from '../data/seedJobs';
 
 export default function Navbar() {
+  const { user, signOut } = useAuth();
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
   const {
     theme,
     toggleTheme,
@@ -45,13 +55,19 @@ export default function Navbar() {
     }
   };
 
+  const handleLogoutConfirm = async () => {
+    setIsLogoutModalOpen(false);
+    await signOut();
+    setActiveTab('kanban');
+  };
+
   const upcomingCount = allReminders.filter(r => new Date(`${r.date}T${r.time || '23:59'}`) >= new Date()).length;
 
   return (
     <header className="navbar glass-panel">
       <div className="navbar-container">
         {/* Brand */}
-        <div className="navbar-brand">
+        <div className="navbar-brand" onClick={() => setActiveTab('kanban')} style={{ cursor: 'pointer' }}>
           <div className="brand-icon">
             <Briefcase size={22} className="text-white" />
           </div>
@@ -138,10 +154,45 @@ export default function Navbar() {
           </div>
 
           {/* New Application CTA */}
-          <button className="btn btn-primary" onClick={openCreateModal}>
+          <button
+            className="btn btn-primary"
+            onClick={user ? openCreateModal : () => setIsAuthOpen(true)}
+          >
             <Plus size={18} />
             <span>Add Application</span>
           </button>
+
+          {/* User Auth Profile / Login Button (Far Right) */}
+          {user ? (
+            <div className={`user-profile-badge ${activeTab === 'profile' ? 'active' : ''}`}>
+              <button
+                className="user-profile-trigger-btn"
+                onClick={() => setActiveTab('profile')}
+                title="View Profile & Settings"
+              >
+                <div className="user-avatar-circle">
+                  {user.email ? user.email.charAt(0).toUpperCase() : <User size={14} />}
+                </div>
+                <span className="user-email-text hidden-mobile">{user.email}</span>
+              </button>
+              <button
+                onClick={() => setIsLogoutModalOpen(true)}
+                className="btn btn-outline btn-icon logout-icon-btn"
+                title="Log Out"
+              >
+                <LogOut size={15} />
+              </button>
+            </div>
+          ) : (
+            <button
+              className="btn btn-outline"
+              onClick={() => setIsAuthOpen(true)}
+              title="Sign In / Register"
+            >
+              <LogIn size={15} />
+              <span>Log In</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -178,6 +229,16 @@ export default function Navbar() {
           </div>
         </div>
       )}
+
+      {/* Auth Modal for Login / Signup / Reset Password */}
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+
+      {/* Logout Confirmation Modal */}
+      <LogoutConfirmModal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={handleLogoutConfirm}
+      />
     </header>
   );
 }
