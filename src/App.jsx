@@ -7,6 +7,7 @@ import TableView from './components/TableView';
 import SankeyView from './components/SankeyView';
 import RemindersView from './components/RemindersView';
 import JobModal from './components/JobModal';
+import { AuthProvider } from './context/AuthContext';
 import './App.css';
 
 function MainApp() {
@@ -35,8 +36,11 @@ function MainApp() {
 
 export default function App() {
   return (
-    <JobProvider>
-      <MainApp />
-    </JobProvider>
+    <AuthProvider>
+      
+      <JobProvider>
+        <MainApp />
+      </JobProvider>
+    </AuthProvider>
   );
 }
