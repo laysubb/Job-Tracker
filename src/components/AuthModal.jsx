@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export default function AuthModal({ isOpen, onClose }) {
-  const { signIn, signUp, resetPassword, updatePassword, isPasswordReset } = useAuth();
+  const { signIn, signUp, resetPassword, updatePassword, isPasswordReset, setIsPasswordReset } = useAuth();
 
   // Mode: 'login' | 'signup' | 'forgot' | 'update_password' | 'verify_email'
   const [mode, setMode] = useState(isPasswordReset ? 'update_password' : 'login');
@@ -31,6 +31,14 @@ export default function AuthModal({ isOpen, onClose }) {
   if (!isOpen && !isPasswordReset) return null;
 
   const currentMode = isPasswordReset ? 'update_password' : mode;
+
+  const handleClose = () => {
+    if (isPasswordReset) {
+      setIsPasswordReset(false);
+    }
+    resetFormState();
+    onClose();
+  };
 
   const resetFormState = () => {
     setError('');
@@ -65,15 +73,13 @@ export default function AuthModal({ isOpen, onClose }) {
 
       if (currentMode === 'login') {
         await signIn(email, password);
-        onClose();
+        handleClose();
       } else if (currentMode === 'signup') {
         const data = await signUp(email, password);
-        // If user already logged in via auto-confirm session
         if (data?.session) {
           setMessage('Account created successfully! You are now logged in.');
-          setTimeout(() => onClose(), 1200);
+          setTimeout(() => handleClose(), 1200);
         } else {
-          // Email verification required
           setMode('verify_email');
         }
       } else if (currentMode === 'forgot') {
@@ -81,10 +87,11 @@ export default function AuthModal({ isOpen, onClose }) {
         setMessage('Password reset link sent! Please check your email inbox.');
       } else if (currentMode === 'update_password') {
         await updatePassword(password);
-        setMessage('Password updated successfully! You can now continue.');
+        setMessage('Password updated successfully! Redirecting...');
         setTimeout(() => {
+          setIsPasswordReset(false);
           switchMode('login');
-          onClose();
+          handleClose();
         }, 1500);
       }
     } catch (err) {
@@ -95,14 +102,12 @@ export default function AuthModal({ isOpen, onClose }) {
   };
 
   return createPortal(
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content auth-modal glass-panel" onClick={(e) => e.stopPropagation()}>
         {/* Close Button */}
-        {!isPasswordReset && (
-          <button className="modal-close-btn" onClick={onClose}>
-            <X size={20} />
-          </button>
-        )}
+        <button className="modal-close-btn" onClick={handleClose} aria-label="Close">
+          <X size={20} />
+        </button>
 
         {/* Modal Header */}
         <div className="auth-header">
