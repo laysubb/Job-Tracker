@@ -7,11 +7,25 @@ import { formatJobsAsText, downloadTextFile } from '../utils/textExport';
 const JobContext = createContext();
 
 const THEME_KEY = 'careerpulse_theme';
+const SIDEBAR_KEY = 'careerpulse_sidebar_open';
 
 export function JobProvider({ children }) {
   const {user} = useAuth(); // get current user
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem(SIDEBAR_KEY);
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(prev => {
+      const next = !prev;
+      localStorage.setItem(SIDEBAR_KEY, String(next));
+      return next;
+    });
+  };
 
   useEffect(()=>{
     async function fetchJobs(){
@@ -362,6 +376,9 @@ export function JobProvider({ children }) {
         deleteJob,
         addReminder,
         deleteReminder,
+        isSidebarOpen,
+        setIsSidebarOpen,
+        toggleSidebar,
         exportDataAsJson,
         exportDataAsCsv,
         exportDataAsText,

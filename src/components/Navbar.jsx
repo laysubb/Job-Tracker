@@ -6,10 +6,6 @@ import LogoutConfirmModal from './LogoutConfirmModal';
 import ExportTextModal from './ExportTextModal';
 import {
   Briefcase,
-  Kanban,
-  Table as TableIcon,
-  GitFork,
-  Calendar,
   Plus,
   Sun,
   Moon,
@@ -21,9 +17,18 @@ import {
   LogIn,
   LogOut,
   User,
-  FileText
+  FileText,
+  PanelLeft
 } from 'lucide-react';
 import { CATEGORIES } from '../data/seedJobs';
+
+const TAB_LABELS = {
+  kanban: 'Kanban Pipeline',
+  table: 'Data Grid',
+  sankey: 'Sankey Studio',
+  reminders: 'Calendar Reminders',
+  profile: 'Profile & Settings'
+};
 
 export default function Navbar() {
   const { user, signOut } = useAuth();
@@ -46,7 +51,8 @@ export default function Navbar() {
     exportDataAsCsv,
     importDataFromJson,
     resetToDefaultData,
-    allReminders
+    isSidebarOpen,
+    toggleSidebar
   } = useJobs();
 
   const fileInputRef = useRef(null);
@@ -65,58 +71,64 @@ export default function Navbar() {
     setActiveTab('kanban');
   };
 
-  const upcomingCount = allReminders.filter(r => new Date(`${r.date}T${r.time || '23:59'}`) >= new Date()).length;
-
   return (
     <header className="navbar glass-panel">
       <div className="navbar-container">
-        {/* Brand */}
-        <div className="navbar-brand" onClick={() => setActiveTab('kanban')} style={{ cursor: 'pointer' }}>
-          <div className="brand-icon">
-            <Briefcase size={22} className="text-white" />
-          </div>
-          <div>
-            <h1 className="brand-title">CareerPulse</h1>
-            <p className="brand-subtitle">Job Pipeline & Sankey Tracker</p>
+        {/* Navbar Left: Sidebar Toggle & Page Title */}
+        <div className="navbar-left">
+          <button
+            className="btn btn-outline btn-icon sidebar-toggle-top-btn"
+            onClick={toggleSidebar}
+            title={isSidebarOpen ? 'Collapse sidebar' : 'Open navigation sidebar'}
+            aria-label="Toggle navigation sidebar"
+          >
+            {!isSidebarOpen ? (
+              <Briefcase size={18} className="text-primary" />
+            ) : (
+              <PanelLeft size={18} />
+            )}
+          </button>
+
+          <div className="navbar-view-info">
+            <h2 className="navbar-page-title">{TAB_LABELS[activeTab] || 'Job Pipeline'}</h2>
           </div>
         </div>
 
-        {/* View Switcher Tabs */}
-        <nav className="view-tabs">
-          <button
-            className={`tab-btn ${activeTab === 'kanban' ? 'active' : ''}`}
-            onClick={() => setActiveTab('kanban')}
-          >
-            <Kanban size={16} />
-            <span>Kanban Pipeline</span>
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'table' ? 'active' : ''}`}
-            onClick={() => setActiveTab('table')}
-          >
-            <TableIcon size={16} />
-            <span>Data Grid</span>
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'sankey' ? 'active' : ''}`}
-            onClick={() => setActiveTab('sankey')}
-          >
-            <GitFork size={16} />
-            <span>Sankey Studio</span>
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'reminders' ? 'active' : ''}`}
-            onClick={() => setActiveTab('reminders')}
-          >
-            <Calendar size={16} />
-            <span>Calendar Reminders</span>
-            {upcomingCount > 0 && (
-              <span className="reminder-badge">{upcomingCount}</span>
-            )}
-          </button>
-        </nav>
+        {/* Filter / Search Bar (Center) for Kanban and Table */}
+        {(activeTab === 'kanban' || activeTab === 'table') && (
+          <div className="navbar-search-section">
+            <div className="search-box">
+              <Search size={15} className="search-icon" />
+              <input
+                type="text"
+                placeholder="Search companies, roles, tags, notes..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="search-input"
+              />
+              {searchTerm && (
+                <button className="clear-btn" onClick={() => setSearchTerm('')}>×</button>
+              )}
+            </div>
 
-        {/* Global Actions */}
+            <div className="filter-selects">
+              <div className="select-wrapper">
+                <SlidersHorizontal size={13} className="select-icon" />
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="filter-select"
+                >
+                  {CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Global Actions - Aligned to the Right */}
         <div className="navbar-actions">
           {/* Theme Toggle */}
           <button
@@ -124,10 +136,10 @@ export default function Navbar() {
             onClick={toggleTheme}
             title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>
 
-          {/* Export All Jobs Button */}
+          {/* Export All Jobs Button (Beside Backup button) */}
           <button
             className="btn btn-outline export-all-jobs-btn"
             onClick={() => setIsExportModalOpen(true)}
@@ -140,7 +152,7 @@ export default function Navbar() {
           {/* Backup dropdown / Actions */}
           <div className="dropdown">
             <button className="btn btn-outline" title="Data Backup & Export">
-              <Download size={13} />
+              <Download size={14} />
               <span className="hidden-mobile">Backup</span>
             </button>
             <div className="dropdown-menu">
@@ -175,7 +187,7 @@ export default function Navbar() {
             className="btn btn-primary"
             onClick={user ? openCreateModal : () => setIsAuthOpen(true)}
           >
-            <Plus size={18} />
+            <Plus size={16} />
             <span>Add Application</span>
           </button>
 
@@ -212,40 +224,6 @@ export default function Navbar() {
           )}
         </div>
       </div>
-
-      {/* Filter / Search Bar for Kanban and Table */}
-      {(activeTab === 'kanban' || activeTab === 'table') && (
-        <div className="filter-bar">
-          <div className="search-box">
-            <Search size={16} className="search-icon" />
-            <input
-              type="text"
-              placeholder="Search companies, roles, tags, notes..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-            {searchTerm && (
-              <button className="clear-btn" onClick={() => setSearchTerm('')}>×</button>
-            )}
-          </div>
-
-          <div className="filter-selects">
-            <div className="select-wrapper">
-              <SlidersHorizontal size={14} className="select-icon" />
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="filter-select"
-              >
-                {CATEGORIES.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Export All Jobs Text Modal */}
       <ExportTextModal
