@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { supabase } from '../libs/supabase';
-import {useAuth} from './AuthContext';
+import { useAuth } from './AuthContext';
+import { formatJobsAsText, downloadTextFile } from '../utils/textExport';
 
 const JobContext = createContext();
 
@@ -290,6 +291,11 @@ export function JobProvider({ children }) {
     URL.revokeObjectURL(url);
   };
 
+  const exportDataAsText = () => {
+    const textContent = formatJobsAsText(jobs);
+    downloadTextFile(textContent);
+  };
+
   const importDataFromJson = (file) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -358,6 +364,7 @@ export function JobProvider({ children }) {
         deleteReminder,
         exportDataAsJson,
         exportDataAsCsv,
+        exportDataAsText,
         importDataFromJson,
         resetToDefaultData
       }}

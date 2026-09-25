@@ -3,6 +3,7 @@ import { useJobs } from '../context/JobContext';
 import { useAuth } from '../context/AuthContext';
 import AuthModal from './AuthModal';
 import LogoutConfirmModal from './LogoutConfirmModal';
+import ExportTextModal from './ExportTextModal';
 import {
   Briefcase,
   Kanban,
@@ -19,7 +20,8 @@ import {
   SlidersHorizontal,
   LogIn,
   LogOut,
-  User
+  User,
+  FileText
 } from 'lucide-react';
 import { CATEGORIES } from '../data/seedJobs';
 
@@ -27,8 +29,10 @@ export default function Navbar() {
   const { user, signOut } = useAuth();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const {
+    jobs,
     theme,
     toggleTheme,
     activeTab,
@@ -123,6 +127,16 @@ export default function Navbar() {
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
+          {/* Export All Jobs Button */}
+          <button
+            className="btn btn-outline export-all-jobs-btn"
+            onClick={() => setIsExportModalOpen(true)}
+            title="Extract Jobs in text form"
+          >
+            <FileText size={15} />
+            <span>Export All Jobs</span>
+          </button>
+
           {/* Backup dropdown / Actions */}
           <div className="dropdown">
             <button className="btn btn-outline" title="Data Backup & Export">
@@ -130,6 +144,9 @@ export default function Navbar() {
               <span className="hidden-mobile">Backup</span>
             </button>
             <div className="dropdown-menu">
+              <button onClick={() => setIsExportModalOpen(true)} className="dropdown-item" title="Extract Jobs in text form">
+                <FileText size={14} /> Export All Jobs (.TXT)
+              </button>
               <button onClick={exportDataAsJson} className="dropdown-item">
                 <Download size={14} /> Export Backup (.JSON)
               </button>
@@ -229,6 +246,13 @@ export default function Navbar() {
           </div>
         </div>
       )}
+
+      {/* Export All Jobs Text Modal */}
+      <ExportTextModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        jobs={jobs}
+      />
 
       {/* Auth Modal for Login / Signup / Reset Password */}
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />

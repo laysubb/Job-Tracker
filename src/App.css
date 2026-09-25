@@ -1659,6 +1659,148 @@
 }
 
 /* ==========================================================================
+   EXPORT ALL JOBS TEXT MODAL STYLES
+   ========================================================================== */
+.export-all-jobs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.export-all-jobs-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+
+.export-text-modal {
+  position: relative;
+  max-width: 640px !important;
+  width: 100%;
+  padding: 28px !important;
+  border-radius: 20px;
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(99, 102, 241, 0.15);
+  animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.export-modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.export-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.export-count-badge {
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.export-text-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.export-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-color);
+}
+
+.export-preview-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.export-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.export-preview-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.export-preview-subtext {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.export-text-area {
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 200px;
+  max-height: 380px;
+  outline: none;
+  transition: var(--transition);
+  font-family: var(--font-mono, monospace);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.export-text-area:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+.export-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
+}
+
+.btn-success {
+  background: #10b981 !important;
+  color: #ffffff !important;
+  border-color: #10b981 !important;
+}
+
+.btn-success:hover {
+  background: #059669 !important;
+  border-color: #059669 !important;
+}
+
+/* ==========================================================================
    USER PROFILE PAGE STYLES
    ========================================================================== */
 .profile-container {
@@ -2301,7 +2443,8 @@
   .modal-content,
   .auth-modal,
   .logout-confirm-modal,
-  .delete-confirm-modal {
+  .delete-confirm-modal,
+  .export-text-modal {
     width: 100% !important;
     max-width: 100% !important;
     max-height: 88vh;
