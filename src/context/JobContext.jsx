@@ -132,59 +132,101 @@ export function JobProvider({ children }) {
   
   
   // --- 3. UPDATE JOB & STATUS ---
-  const updateJob = async (id, updatedFields) => {
-    let updatedJobObj = null;
+  const updateJob = async (id, updatedFields, customNote = "") => {
+    // Determine previous status to see if status was changed
+    const currentJob = jobs.find(j => String(j.id) === String(id));
+    const oldStatus = currentJob?.status;
+    const isStatusChanged = Boolean(updatedFields.status && updatedFields.status !== oldStatus);
+
     let newHistoryItem = null;
+    if (isStatusChanged) {
+      newHistoryItem = {
+        stage: updatedFields.status,
+        date: new Date().toISOString().split('T')[0],
+        note: customNote || `Status updated to ${updatedFields.status.replace(/_/g, ' ')}`
+      };
+      if (updatedFields.status === 'offer' || updatedFields.status === 'accepted') {
+        triggerCelebration();
+      }
+    }
+
+    // 1. Optimistically update local React state immediately for snappy UI
     setJobs(prev =>
       prev.map(job => {
-        if (job.id !== id) return job;
-        let newHistory = job.history || [];
-        if (updatedFields.status && updatedFields.status !== job.status) {
-          newHistoryItem = {
-            stage: updatedFields.status,
-            date: new Date().toISOString().split('T')[0],
-            note: `Status updated to ${updatedFields.status.replace('_', ' ')}`
-          };
-          newHistory = [...newHistory, newHistoryItem];
-          if (updatedFields.status === 'offer' || updatedFields.status === 'accepted') {
-            triggerCelebration();
-          }
-        }
-        updatedJobObj = {
+        if (String(job.id) !== String(id)) return job;
+        const newHistory = newHistoryItem
+          ? [...(job.history || []), newHistoryItem]
+          : (job.history || []);
+        return {
           ...job,
           ...updatedFields,
           history: newHistory
         };
-        return updatedJobObj;
       })
     );
-    if (updatedJobObj) {
-      // 1. Update jobs table (strip child arrays)
-      const { history, reminders, ...jobRecord } = updatedJobObj;
-      const { error: jobError } = await supabase.from('jobs').update(jobRecord).eq('id', id);
-      if (jobError) console.error("Failed to update job:", jobError.message);
-      // 2. If status changed, insert new row into job_history
-      if (newHistoryItem) {
-        const { error: histError } = await supabase.from('job_history').insert([{
-          job_id: id,
-          stage: newHistoryItem.stage,
-          date: newHistoryItem.date,
-          note: newHistoryItem.note
-        }]);
-        if (histError) console.error("Failed to insert history item:", histError.message);
+
+    // Keep editingJob in sync if currently open in modal
+    setEditingJob(prev => {
+      if (!prev || String(prev.id) !== String(id)) return prev;
+      const newHistory = newHistoryItem
+        ? [...(prev.history || []), newHistoryItem]
+        : (prev.history || []);
+      return {
+        ...prev,
+        ...updatedFields,
+        history: newHistory
+      };
+    });
+
+    // 2. Persist updates to Supabase database
+    try {
+      // Exclude relational child arrays and id from the direct jobs table payload
+      const { history, reminders, id: _id, ...fieldsToUpdate } = updatedFields;
+
+      if (Object.keys(fieldsToUpdate).length > 0) {
+        const { error: jobError } = await supabase
+          .from('jobs')
+          .update(fieldsToUpdate)
+          .eq('id', id);
+
+        if (jobError) {
+          console.error("Failed to update job in DB:", jobError.message);
+        }
       }
+
+      // If status changed, insert new audit record into job_history child table
+      if (newHistoryItem) {
+        const { error: histError } = await supabase
+          .from('job_history')
+          .insert([{
+            job_id: id,
+            stage: newHistoryItem.stage,
+            date: newHistoryItem.date,
+            note: newHistoryItem.note
+          }]);
+
+        if (histError) {
+          console.error("Failed to insert history item into DB:", histError.message);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to persist job update to Supabase:", err);
     }
   };
+
   const updateJobStatus = async (id, newStatus, note = "") => {
-    await updateJob(id, { status: newStatus });
+    await updateJob(id, { status: newStatus }, note);
   };
+
   // --- 4. DELETE JOB ---
   const deleteJob = async (id) => {
-    setJobs(prev => prev.filter(j => j.id !== id));
+    setJobs(prev => prev.filter(j => String(j.id) !== String(id)));
+    setEditingJob(prev => (prev && String(prev.id) === String(id) ? null : prev));
     // Deleting the job automatically deletes all its history & reminders (ON DELETE CASCADE)
     const { error } = await supabase.from('jobs').delete().eq('id', id);
     if (error) console.error("Failed to delete job:", error.message);
   };
+
   // --- 5. ADD & DELETE REMINDERS ---
   const addReminder = async (jobId, reminderData) => {
     const newReminder = {
@@ -201,28 +243,43 @@ export function JobProvider({ children }) {
     // Immediate UI update
     setJobs(prev =>
       prev.map(job => {
-        if (job.id !== jobId) return job;
+        if (String(job.id) !== String(jobId)) return job;
         return {
           ...job,
           reminders: [...(job.reminders || []), newReminder]
         };
       })
     );
+    setEditingJob(prev => {
+      if (!prev || String(prev.id) !== String(jobId)) return prev;
+      return {
+        ...prev,
+        reminders: [...(prev.reminders || []), newReminder]
+      };
+    });
     // Insert into 'job_reminders' table
     const { error } = await supabase.from('job_reminders').insert([newReminder]);
     if (error) console.error("Failed to add reminder:", error.message);
   };
+
   const deleteReminder = async (jobId, reminderId) => {
     // Immediate UI update
     setJobs(prev =>
       prev.map(job => {
-        if (job.id !== jobId) return job;
+        if (String(job.id) !== String(jobId)) return job;
         return {
           ...job,
-          reminders: (job.reminders || []).filter(r => r.id !== reminderId)
+          reminders: (job.reminders || []).filter(r => String(r.id) !== String(reminderId))
         };
       })
     );
+    setEditingJob(prev => {
+      if (!prev || String(prev.id) !== String(jobId)) return prev;
+      return {
+        ...prev,
+        reminders: (prev.reminders || []).filter(r => String(r.id) !== String(reminderId))
+      };
+    });
     // Delete from 'job_reminders' table
     const { error } = await supabase.from('job_reminders').delete().eq('id', reminderId);
     if (error) console.error("Failed to delete reminder:", error.message);

@@ -115,7 +115,10 @@ export default function KanbanCard({ job }) {
         {nextStage && (
           <button
             className="quick-advance-btn"
-            onClick={() => updateJobStatus(job.id, nextStage.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              updateJobStatus(job.id, nextStage.id);
+            }}
             title={`Advance to ${nextStage.label}`}
           >
             <span>Advance</span>
@@ -127,7 +130,11 @@ export default function KanbanCard({ job }) {
         <select
           className="stage-selector"
           value={job.status}
-          onChange={(e) => updateJobStatus(job.id, e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            e.stopPropagation();
+            updateJobStatus(job.id, e.target.value);
+          }}
           title="Change Status"
         >
           {STATUS_COLUMNS.map(col => (
